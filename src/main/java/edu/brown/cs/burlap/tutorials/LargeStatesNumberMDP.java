@@ -1,8 +1,13 @@
 package edu.brown.cs.burlap.tutorials;
 
+import burlap.behavior.learningrate.ExponentialDecayLR;
+import burlap.behavior.policy.BoltzmannQPolicy;
+import burlap.behavior.policy.EpsilonGreedy;
+import burlap.behavior.policy.GreedyDeterministicQPolicy;
 import burlap.behavior.policy.GreedyQPolicy;
 import burlap.behavior.policy.Policy;
 import burlap.behavior.policy.PolicyUtils;
+import burlap.behavior.policy.RandomPolicy;
 import burlap.behavior.singleagent.Episode;
 import burlap.behavior.singleagent.auxiliary.EpisodeSequenceVisualizer;
 import burlap.behavior.singleagent.auxiliary.StateReachability;
@@ -66,10 +71,24 @@ public class LargeStatesNumberMDP {
 
 	// *HIGHLIGHT* Sets this to false, to stops debug output from interfering the executing time.
 	boolean enableDebugPrint;
+	boolean enableVisualization;
 
 
-	public LargeStatesNumberMDP(boolean enableDebugPrint){
+	public LargeStatesNumberMDP(boolean enableDebugPrint, boolean enableVisualization){
 		gwdg = new GridWorldDomain(40, 40);
+
+		// *HIGHLIGHT* Adding walls.
+//		gwdg.verticalWall(0, 8, 20);
+//		gwdg.verticalWall(10, 25, 20);
+//		gwdg.verticalWall(27, 39, 20);
+//		gwdg.horizontalWall(0, 7, 22);
+//		gwdg.horizontalWall(9, 19, 22);
+//		gwdg.horizontalWall(21, 27, 18);
+//		gwdg.horizontalWall(29, 39, 18);
+		
+		// *HIGHLIGHT* Change the success rate of actions.
+		gwdg.setProbSucceedTransitionDynamics(0.7);
+		
 		tf = new GridWorldTerminalFunction(39, 39);
 //		new SinglePFTF(PropositionalFunction.findPF(gw.generatePfs(), GridWorldDomain.PF_AT_LOCATION));
 //		final RewardFunction rf = new GoalBasedRF(new TFGoalCondition(tf), 5., -0.1);
@@ -84,6 +103,7 @@ public class LargeStatesNumberMDP {
 		env = new SimulatedEnvironment(domain, initialState);
 		
 		this.enableDebugPrint = enableDebugPrint;
+		this.enableVisualization = enableVisualization;
 	}
 
 
@@ -93,17 +113,21 @@ public class LargeStatesNumberMDP {
 	}
 
 	public void valueIteration(String outputPath){
-		Planner planner = new ValueIteration(domain, 0.99, hashingFactory, 0.001, 100);
+		Planner planner = new ValueIteration(domain, 0.99, hashingFactory, 0.001, 200);
 		planner.toggleDebugPrinting(this.enableDebugPrint);
 		long start = System.currentTimeMillis();
 		Policy p = planner.planFromState(initialState);
 		long end = System.currentTimeMillis();
 		System.out.println("Value Iteration: " + (end - start) / 1000.0);
 
-		PolicyUtils.rollout(p, initialState, domain.getModel()).write(outputPath + "vi");
-
-		simpleValueFunctionVis((ValueFunction)planner, p);
-		//manualValueFunctionVis((ValueFunction)planner, p);
+		if (enableDebugPrint && enableVisualization) {
+			PolicyUtils.rollout(p, initialState, domain.getModel()).write(outputPath + "vi");
+		}
+		
+		if (enableVisualization) {
+			simpleValueFunctionVis((ValueFunction)planner, p);
+			//manualValueFunctionVis((ValueFunction)planner, p);
+		}
 	}
 
 	public void policyIteration(String outputPath){
@@ -114,22 +138,34 @@ public class LargeStatesNumberMDP {
 		long end = System.currentTimeMillis();
 		System.out.println("Policy Iteration: " + (end - start) / 1000.0);
 
-		PolicyUtils.rollout(p, initialState, domain.getModel()).write(outputPath + "pi");
+		if (enableDebugPrint && enableVisualization) {
+			PolicyUtils.rollout(p, initialState, domain.getModel()).write(outputPath + "pi");
+		}
 
-		simpleValueFunctionVis((ValueFunction)planner, p);
-		//manualValueFunctionVis((ValueFunction)planner, p);
+		if (enableVisualization) {
+			simpleValueFunctionVis((ValueFunction)planner, p);
+			//manualValueFunctionVis((ValueFunction)planner, p);
+		}
 	}
 
 
 	public void qLearning(String outputPath){
 		LearningAgent agent = new QLearning(domain, 0.99, hashingFactory, 0., 1.);
-
+		((QLearning) agent).setLearningRateFunction(new ExponentialDecayLR(1, 0.999999));
+		int numEpisodes = 10000;
+		// *HIGHLIGHTS* use different exploration strategies.
+//		((QLearning) agent).setLearningPolicy(new BoltzmannQPolicy((QProvider) agent, 1));  // success rate = 1 -> numEpisodes = 20
+//		((QLearning) agent).setLearningPolicy(new EpsilonGreedy((QProvider) agent, 0.1));  // default. success rate = 1 -> numEpisodes = 40
+//		((QLearning) agent).setLearningPolicy(new GreedyDeterministicQPolicy((QProvider) agent));  // success rate = 1 -> numEpisodes = 26
+//		((QLearning) agent).setLearningPolicy(new GreedyQPolicy((QProvider) agent));  // success rate = 1 -> numEpisodes = 19
+//		((QLearning) agent).setLearningPolicy(new RandomPolicy(domain));  // success rate = 1 -> numEpisodes = 1800
+		
 		if (this.enableDebugPrint) {
 			System.out.println("q learning max time step: ");
 		}
 		long start = System.currentTimeMillis();
 		//run learning for 2500 episodes
-		for(int i = 0; i < 2500; i++){
+		for(int i = 0; i < numEpisodes; i++){
 			Episode e = agent.runLearningEpisode(env);
 
 			if (this.enableDebugPrint) {
@@ -142,7 +178,9 @@ public class LargeStatesNumberMDP {
 		long end = System.currentTimeMillis();
 		System.out.println("QLearning: " + (end - start) / 1000.0);
 
-		simpleValueFunctionVis((ValueFunction)agent, new GreedyQPolicy((QProvider) agent));
+		if (enableDebugPrint && enableVisualization) {
+			simpleValueFunctionVis((ValueFunction)agent, new GreedyQPolicy((QProvider) agent));
+		}
 	}
 
 	public void simpleValueFunctionVis(ValueFunction valueFunction, Policy p){
@@ -234,8 +272,8 @@ public class LargeStatesNumberMDP {
 
 
 	public static void main(String[] args) {
-
-		LargeStatesNumberMDP example = new LargeStatesNumberMDP(true);
+		// *HIGHLIGHT* Sets this to false, to stops debug output from interfering the executing time.
+		LargeStatesNumberMDP example = new LargeStatesNumberMDP(true, true);
 		String outputPath = "output/";
 
 		example.valueIteration(outputPath);

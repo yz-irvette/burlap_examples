@@ -1,6 +1,9 @@
 package edu.brown.cs.burlap.tutorials;
 
 import burlap.behavior.learningrate.ExponentialDecayLR;
+import burlap.behavior.policy.BoltzmannQPolicy;
+import burlap.behavior.policy.EpsilonGreedy;
+import burlap.behavior.policy.GreedyDeterministicQPolicy;
 import burlap.behavior.policy.GreedyQPolicy;
 import burlap.behavior.policy.Policy;
 import burlap.behavior.policy.PolicyUtils;
@@ -65,13 +68,22 @@ public class SmallStatesNumberMDP {
 	HashableStateFactory hashingFactory;
 	SimulatedEnvironment env;
 
-	// *HIGHLIGHT* Sets this to false, to stops debug output from interfering the executing time.
+	// *HIGHLIGHT* Sets these to false, to stops debug output from interfering the executing time.
 	boolean enableDebugPrint;
 	boolean enableVisualization;
 
 
 	public SmallStatesNumberMDP(boolean enableDebugPrint, boolean enableVisualization){
 		gwdg = new GridWorldDomain(4, 4);
+		
+		// *HIGHLIGHT* Adding a wall resulting in value & policy results changes
+//		gwdg.verticalWall(1, 3, 1);
+		// *HIGHLIGHT* Adding a wall with no change in non-wall value & policy results
+//		gwdg.verticalWall(0, 2, 1);
+		
+		// *HIGHLIGHT* Change the success rate of actions.
+		gwdg.setProbSucceedTransitionDynamics(0.7);
+		
 		tf = new GridWorldTerminalFunction(3, 3);
 		gwdg.setTf(tf);
 		goalCondition = new TFGoalCondition(tf);
@@ -127,17 +139,21 @@ public class SmallStatesNumberMDP {
 
 	public void qLearning(String outputPath){
 		LearningAgent agent = new QLearning(domain, 0.99, hashingFactory, 0., 1.);
-		// *HIGHLIGHTS* use different exploration strategies.
-//		((QLearning) agent)agent.setLearningPolicy(new BoltzmannQPolicy());
-//		((QLearning) agent).setLearningPolicy(new RandomPolicy(domain));
+		((QLearning) agent).setLearningRateFunction(new ExponentialDecayLR(1, 0.999));
+		int numEpisodes = 10000;
 		
+		// *HIGHLIGHTS* use different exploration strategies.
+//		((QLearning) agent).setLearningPolicy(new BoltzmannQPolicy((QProvider) agent, 1));  // success rate = 1 -> numEpisodes = 20
+//		((QLearning) agent).setLearningPolicy(new EpsilonGreedy((QProvider) agent, 0.1));  // default. success rate = 1 ->  numEpisodes = 40
+//		((QLearning) agent).setLearningPolicy(new GreedyDeterministicQPolicy((QProvider) agent));  // success rate = 1 -> numEpisodes = 26
+//		((QLearning) agent).setLearningPolicy(new GreedyQPolicy((QProvider) agent));  // success rate = 1 -> numEpisodes = 19
+//		((QLearning) agent).setLearningPolicy(new RandomPolicy(domain));  // success rate = 1 -> numEpisodes = 18
 		
 		if (this.enableDebugPrint) {
 			System.out.println("q learning max time step: ");
 		}
 		long start = System.currentTimeMillis();
-		//run learning for 40 episodes
-		for(int i = 0; i < 40; i++){
+		for(int i = 0; i < numEpisodes; i++){
 			Episode e = agent.runLearningEpisode(env);
 
 			if (this.enableDebugPrint) {
@@ -245,7 +261,7 @@ public class SmallStatesNumberMDP {
 
 
 	public static void main(String[] args) {
-
+		// *HIGHLIGHT* Sets these to false, to stops debug output from interfering the executing time.
 		SmallStatesNumberMDP example = new SmallStatesNumberMDP(true, true);
 		String outputPath = "output/";
 
