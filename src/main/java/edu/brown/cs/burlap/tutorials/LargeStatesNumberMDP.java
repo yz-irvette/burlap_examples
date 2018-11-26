@@ -113,7 +113,7 @@ public class LargeStatesNumberMDP {
 	}
 
 	public void valueIteration(String outputPath){
-		Planner planner = new ValueIteration(domain, 0.99, hashingFactory, 0.001, 200);
+		Planner planner = new ValueIteration(domain, 0.99, hashingFactory, 0.001, 500);
 		planner.toggleDebugPrinting(this.enableDebugPrint);
 		long start = System.currentTimeMillis();
 		Policy p = planner.planFromState(initialState);

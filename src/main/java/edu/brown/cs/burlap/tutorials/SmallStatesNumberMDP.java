@@ -76,9 +76,7 @@ public class SmallStatesNumberMDP {
 	public SmallStatesNumberMDP(boolean enableDebugPrint, boolean enableVisualization){
 		gwdg = new GridWorldDomain(4, 4);
 		
-		// *HIGHLIGHT* Adding a wall resulting in value & policy results changes
-//		gwdg.verticalWall(1, 3, 1);
-		// *HIGHLIGHT* Adding a wall with no change in non-wall value & policy results
+		// *HIGHLIGHT* Adding a wall with change in stochastic game, but no change in non-wall value of deterministic game
 //		gwdg.verticalWall(0, 2, 1);
 		
 		// *HIGHLIGHT* Change the success rate of actions.
@@ -105,7 +103,7 @@ public class SmallStatesNumberMDP {
 	}
 
 	public void valueIteration(String outputPath){
-		Planner planner = new ValueIteration(domain, 0.99, hashingFactory, 0.001, 100);
+		Planner planner = new ValueIteration(domain, 0.99, hashingFactory, 0.001, 200);
 		planner.toggleDebugPrinting(this.enableDebugPrint);
 		long start = System.currentTimeMillis();
 		Policy p = planner.planFromState(initialState);
